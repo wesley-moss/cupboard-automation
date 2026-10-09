@@ -1,0 +1,26 @@
+{
+  "_note": "Copy to door_config.json. Keys starting with _ are ignored. Pin changes need a restart; everything else can be changed from the web page.",
+  "steps_to_open": 1600,
+  "speed_pps": 800,
+  "ramp_steps": 200,
+  "start_pps": 150,
+  "open_dir": 1,
+  "close_margin_steps": 300,
+  "temp_delta_c": 3.0,
+  "temp_window_s": 300,
+  "temp_poll_s": 10.0,
+  "book_debounce_ms": 50,
+  "book_lockout_s": 3.0,
+  "web_port": 8080,
+  "sensor_wait_s": 60,
+  "w1_devices_dir": "/sys/bus/w1/devices",
+  "gpio_chip": null,
+  "pins": {
+    "step": 20,
+    "dir": 21,
+    "en": 16,
+    "door_closed": 23,
+    "book_lever": 24,
+    "one_wire": 4
+  }
+}

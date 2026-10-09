@@ -1,0 +1,41 @@
+[Unit]
+Description=Cupboard door controller
+After=network-online.target
+Wants=network-online.target
+# Never give up restarting, however often it fails.
+StartLimitIntervalSec=0
+
+[Service]
+# Type=notify: the program tells systemd when it is ready and then keeps
+# checking in. If it stops checking in for WatchdogSec, systemd restarts it.
+Type=notify
+NotifyAccess=main
+WatchdogSec=30
+User=cupboard-door
+Group=cupboard-door
+SupplementaryGroups=gpio
+# The code lives in /opt/cupboard-door. Settings live in /var/lib/cupboard-door
+# (created by systemd, owned by the service user).
+StateDirectory=cupboard-door
+# lgpio keeps small working files in its working folder. /run is in RAM, so
+# this costs no SD card writes.
+RuntimeDirectory=cupboard-door
+WorkingDirectory=/run/cupboard-door
+Environment=LG_WD=/run/cupboard-door
+Environment=PYTHONPATH=/opt/cupboard-door
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/cupboard-door/venv/bin/python -m cupboard_door --config /var/lib/cupboard-door/door_config.json
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cupboard-door
+# Basic hardening; the program only needs GPIO and its settings folder.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

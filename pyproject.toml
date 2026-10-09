@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cupboard-door"
+version = "1.0.0"
+description = "Automated AC cupboard door for a Raspberry Pi 5 (A4988 stepper, limit switches, DS18B20)"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["Flask>=2.2", "gpiozero>=2.0"]
+
+[project.optional-dependencies]
+pi = ["lgpio>=0.2"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+cupboard-door = "cupboard_door.main:main"
+
+[tool.setuptools]
+packages = ["cupboard_door"]
+
+[tool.setuptools.package-data]
+cupboard_door = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

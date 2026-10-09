@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111418">
+<title>Cupboard Door</title>
+<style>
+  :root {
+    --bg: #111418; --card: #1b2027; --line: #2b323c; --text: #e7eaee; --dim: #9aa4b1;
+    --accent: #4f9dff; --ok: #3fbf74; --warn: #e3b341; --bad: #f05d5e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.3rem; margin: 4px 0 16px; }
+  h2 { font-size: 1rem; margin: 0 0 12px; color: var(--dim); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; margin-bottom: 16px; }
+  .state { font-size: 2rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .state.closed { color: var(--ok); } .state.open { color: var(--accent); }
+  .state.unknown { color: var(--warn); } .state.moving { color: var(--text); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 12px; }
+  .label { color: var(--dim); font-size: .85rem; }
+  .banner { border-radius: 10px; padding: 12px; margin-bottom: 16px; display: none; }
+  .banner.show { display: block; }
+  .banner.fault { background: #3a1a1c; border: 1px solid var(--bad); }
+  .banner.unknown { background: #33290f; border: 1px solid var(--warn); }
+  .row { display: grid; gap: 8px; }
+  .row.three { grid-template-columns: repeat(3, 1fr); }
+  .row.four { grid-template-columns: repeat(4, 1fr); }
+  button { font: inherit; font-weight: 600; color: var(--text); background: #2a313b;
+           border: 1px solid var(--line); border-radius: 10px; padding: 14px 6px;
+           cursor: pointer; min-height: 48px; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  form { display: grid; gap: 12px; }
+  label { display: grid; gap: 4px; font-size: .9rem; color: var(--dim); }
+  input, select { font: inherit; color: var(--text); background: var(--bg);
+                  border: 1px solid var(--line); border-radius: 8px; padding: 10px; width: 100%; }
+  .msg { min-height: 1.4em; margin-top: 10px; color: var(--dim); font-size: .9rem; }
+  .msg.err { color: var(--bad); }
+  .sim { border-style: dashed; }
+  .small { font-size: .8rem; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cupboard Door</h1>
+
+  <div id="faultBanner" class="banner fault">
+    <strong>Fault.</strong> <span id="faultText"></span>
+    <div style="margin-top:10px"><button class="danger" onclick="act('reset_fault')">Reset fault</button></div>
+  </div>
+  <div id="unknownBanner" class="banner unknown">
+    <strong>Door position unknown.</strong> Power may have been cut while the door was moving.
+    The motor is off. Close, Open or Toggle will drive the door closed until it finds the
+    closed switch. It will not open from an unknown position.
+  </div>
+
+  <section class="card">
+    <div class="label">Door</div>
+    <div id="state" class="state">...</div>
+    <div class="grid">
+      <div><div class="label">Temperature</div><div id="temp">...</div></div>
+      <div><div class="label">Fault</div><div id="fault">...</div></div>
+      <div><div class="label">Closed switch</div><div id="closedSw">...</div></div>
+      <div><div class="label">Book lever</div><div id="bookSw">...</div></div>
+      <div><div class="label">Position (steps)</div><div id="pos">...</div></div>
+      <div><div class="label">Motor driver</div><div id="driver">...</div></div>
+    </div>
+    <div style="margin-top:12px"><div class="label">Last event</div><div id="event">...</div></div>
+  </section>
+
+  <section class="card">
+    <div class="row three">
+      <button class="primary" onclick="act('open')">OPEN</button>
+      <button class="primary" onclick="act('close')">CLOSE</button>
+      <button class="primary" onclick="act('toggle')">TOGGLE</button>
+    </div>
+    <h2 style="margin-top:16px">Jog (steps, + is the open direction)</h2>
+    <div class="row four">
+      <button onclick="jog(-200)">-200</button>
+      <button onclick="jog(-50)">-50</button>
+      <button onclick="jog(50)">+50</button>
+      <button onclick="jog(200)">+200</button>
+    </div>
+    <div id="actMsg" class="msg"></div>
+  </section>
+
+  <section id="simCard" class="card sim" style="display:none">
+    <h2>Simulator</h2>
+    <div class="row three">
+      <button onclick="sim('book_pull', {})">Pull book</button>
+      <button onclick="sim('temperature', {delta: -1})">Temp -1 C</button>
+      <button onclick="sim('temperature', {delta: 1})">Temp +1 C</button>
+    </div>
+    <div class="row three" style="margin-top:8px">
+      <button onclick="sim('temperature', {delta: 3})">Temp +3 C</button>
+      <button id="sensorBtn" onclick="toggleSensor()">Unplug sensor</button>
+      <button id="switchBtn" onclick="toggleSwitch()">Break switch</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <form id="settings" onsubmit="saveSettings(event)">
+      <label>Steps to open <input name="steps_to_open" type="number" min="1" step="1" required></label>
+      <label>Speed (steps per second) <input name="speed_pps" type="number" min="10" step="1" required></label>
+      <label>Ramp steps (speed up and slow down) <input name="ramp_steps" type="number" min="0" step="1" required></label>
+      <label>Opening direction
+        <select name="open_dir"><option value="1">DIR pin high opens</option><option value="0">DIR pin low opens</option></select>
+      </label>
+      <label>Temperature change to open (C) <input name="temp_delta_c" type="number" min="0.1" step="0.1" required></label>
+      <label>Temperature window (seconds) <input name="temp_window_s" type="number" min="10" step="1" required></label>
+      <label>Book lockout (seconds) <input name="book_lockout_s" type="number" min="0" step="0.1" required></label>
+      <button class="primary" type="submit">Save settings</button>
+    </form>
+    <div id="setMsg" class="msg"></div>
+    <div class="small" id="cfgPath"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let sensorMissing = false, switchBroken = false;
+
+async function call(method, url, body) {
+  const opts = { method, headers: { "Content-Type": "application/json" } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  return { ok: r.ok, data };
+}
+
+function show(el, text, isErr) {
+  el.textContent = text || "";
+  el.className = "msg" + (isErr ? " err" : "");
+}
+
+async function act(name) {
+  try {
+    const { ok, data } = await call("POST", "/api/" + name, {});
+    show($("actMsg"), data.message, !ok);
+  } catch (e) { show($("actMsg"), "Cannot reach the door controller", true); }
+  refresh();
+}
+
+async function jog(steps) {
+  try {
+    const { ok, data } = await call("POST", "/api/jog", { steps });
+    show($("actMsg"), data.message, !ok);
+  } catch (e) { show($("actMsg"), "Cannot reach the door controller", true); }
+  refresh();
+}
+
+async function sim(name, body) {
+  await call("POST", "/api/sim/" + name, body);
+  setTimeout(refresh, 300);
+}
+function toggleSensor() {
+  sensorMissing = !sensorMissing;
+  $("sensorBtn").textContent = sensorMissing ? "Plug in sensor" : "Unplug sensor";
+  sim("sensor", { missing: sensorMissing });
+}
+function toggleSwitch() {
+  switchBroken = !switchBroken;
+  $("switchBtn").textContent = switchBroken ? "Fix switch" : "Break switch";
+  sim("switch_broken", { broken: switchBroken });
+}
+
+async function refresh() {
+  try {
+    const { data: s } = await call("GET", "/api/status");
+    const st = $("state");
+    st.textContent = s.state;
+    st.className = "state " + (s.moving ? "moving" : s.state);
+    $("temp").textContent = s.temperature_c === null
+      ? (s.sensor_found ? "Read error" : "No sensor") : s.temperature_c.toFixed(1) + " C";
+    $("fault").textContent = s.fault ? "YES" : "None";
+    $("fault").style.color = s.fault ? "var(--bad)" : "";
+    $("closedSw").textContent = s.closed_switch ? "Pressed" : "Not pressed";
+    $("bookSw").textContent = s.book_switch ? "Book in place" : "Released";
+    $("pos").textContent = s.position === null ? "Unknown" : s.position;
+    $("driver").textContent = s.driver_enabled ? "ON" : "Off";
+    $("event").textContent = s.last_event + "  (" + s.last_event_time + ")";
+    $("faultText").textContent = s.fault_reason;
+    $("faultBanner").classList.toggle("show", s.fault);
+    $("unknownBanner").classList.toggle("show", !s.fault && s.state === "unknown");
+    $("simCard").style.display = s.simulate ? "" : "none";
+  } catch (e) {
+    $("state").textContent = "offline";
+    $("state").className = "state unknown";
+  }
+}
+
+async function loadSettings() {
+  const { data } = await call("GET", "/api/config");
+  const f = $("settings");
+  for (const [k, v] of Object.entries(data.settings)) {
+    if (f.elements[k]) f.elements[k].value = v;
+  }
+  $("cfgPath").textContent = "Saved to " + data.path;
+}
+
+async function saveSettings(ev) {
+  ev.preventDefault();
+  const f = $("settings"), body = {};
+  for (const el of f.elements) {
+    if (el.name) body[el.name] = Number(el.value);
+  }
+  try {
+    const { ok, data } = await call("POST", "/api/config", body);
+    show($("setMsg"), data.message, !ok);
+  } catch (e) { show($("setMsg"), "Cannot reach the door controller", true); }
+}
+
+refresh();
+loadSettings();
+setInterval(refresh, 1000);
+</script>
+</body>
+</html>

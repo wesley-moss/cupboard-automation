@@ -1,0 +1,5 @@
+# Runtime dependencies.
+# On the Pi, lgpio comes from apt (python3-lgpio) and the venv is created with
+# --system-site-packages so it can see it. install.sh handles this.
+Flask>=2.2
+gpiozero>=2.0
