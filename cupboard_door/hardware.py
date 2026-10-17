@@ -65,8 +65,10 @@ class Hardware:
         except Exception as exc:
             self.close()
             raise HardwareError(
-                f"Could not set up the GPIO pins ({exc}). If the service is running, "
-                "stop it first with: sudo systemctl stop cupboard-door"
+                f"Could not set up the GPIO pins ({type(exc).__name__}: {exc}). "
+                "Check that nothing else is using these pins (another script, test mode, "
+                "or the service while you run it by hand: sudo systemctl stop cupboard-door), "
+                "and that the user running this is in the gpio group (groups <user>)."
             ) from exc
         # Talk to the STEP pin directly to keep the per-step overhead small.
         self._step_pin = self._step.pin

@@ -77,14 +77,29 @@ step "Installing and enabling the systemd service"
 install -m 644 "$SRC_DIR/cupboard-door.service" "/etc/systemd/system/$SERVICE.service"
 systemctl daemon-reload
 systemctl enable "$SERVICE.service"
-systemctl restart "$SERVICE.service"
+# Do not stop the installer if the service fails to start: everything else is
+# in place, and the log lines below show why it failed.
+START_OK=1
+systemctl restart "$SERVICE.service" || START_OK=0
 sleep 2
-systemctl --no-pager --lines=5 status "$SERVICE.service" || true
+systemctl is-active --quiet "$SERVICE.service" || START_OK=0
+systemctl --no-pager --lines=0 status "$SERVICE.service" || true
+if [[ $START_OK == 0 ]]; then
+  echo
+  echo "!! The service did not start. Its last log lines:"
+  journalctl -u "$SERVICE.service" -b --no-pager -n 15 -o cat || true
+  echo
+  echo "!! systemd will keep retrying every 5 seconds. See Troubleshooting in README.md."
+fi
 
 PORT=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('web_port', 8080))" "$STATE_DIR/door_config.json" 2>/dev/null || echo 8080)
 IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 echo
-echo "Done. The door controller starts by itself on every boot."
+if [[ $START_OK == 1 ]]; then
+  echo "Done. The door controller starts by itself on every boot."
+else
+  echo "Installed, but the service is not running yet (see the log above)."
+fi
 echo "Web page:  http://${IP:-<pi-ip-address>}:$PORT/"
 echo "     or:   http://$(hostname).local:$PORT/"
 echo "Logs:      journalctl -u $SERVICE -f"
