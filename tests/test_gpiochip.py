@@ -59,3 +59,63 @@ def test_no_header_chip_is_an_error(monkeypatch):
     use_chips(monkeypatch, [0])
     with pytest.raises(HardwareError):
         find_header_chip(FakeLgpio({0: "gpio-brcmstb@107d508500"}))
+
+
+class FakeLgpioDevice:
+    """Enough of lgpio for gpiozero's LGPIOFactory and LGPIOPin, with only the
+    chips that exist on the reporting Pi 5 (gpiochip11 to gpiochip15)."""
+
+    error = Exception
+    SET_PULL_NONE, SET_PULL_UP, SET_PULL_DOWN, BOTH_EDGES = 0, 32, 64, 3
+
+    def __init__(self, chips=(11, 12, 13, 14, 15)):
+        self.chips, self.opened, self.levels, self.outputs = set(chips), [], {}, set()
+
+    def gpiochip_open(self, chip):
+        if chip not in self.chips:
+            raise Exception("'can not open gpiochip'")
+        self.opened.append(chip)
+        return chip
+
+    def gpiochip_close(self, handle): pass
+    def gpio_claim_input(self, h, gpio, flags=0):
+        self.outputs.discard(gpio)
+        self.levels.setdefault(gpio, 1)
+
+    def gpio_claim_output(self, h, gpio, level=0, flags=0):
+        self.outputs.add(gpio)
+        self.levels[gpio] = level
+
+    def gpio_write(self, h, gpio, level): self.levels[gpio] = level
+    def gpio_read(self, h, gpio): return self.levels.get(gpio, 1)
+    def gpio_get_mode(self, h, gpio): return 2 if gpio in self.outputs else 0
+    def gpio_free(self, h, gpio): pass
+
+    def __getattr__(self, name):  # any other lgpio call gpiozero might make
+        return lambda *a, **k: 0
+
+
+def test_gpiozero_201_chip_bug_is_worked_around(monkeypatch):
+    """gpiozero 2.0.1 ignores chip= and opens gpiochip4 on a Pi 5. Our factory
+    must still end up on the chip we asked for."""
+    import sys
+
+    fake = FakeLgpioDevice()
+    monkeypatch.setitem(sys.modules, "lgpio", fake)
+    lgpio_pins = pytest.importorskip("gpiozero.pins.lgpio")
+    monkeypatch.setattr(lgpio_pins, "lgpio", fake)
+    monkeypatch.setattr(lgpio_pins.LGPIOFactory, "_get_revision", lambda self: 0xD04170)  # Pi 5
+
+    factory = hardware.make_real_factory(15)
+    assert factory._chip == 15
+    assert 15 in fake.opened
+
+    from cupboard_door.config import DEFAULT_PINS
+
+    hw = hardware.Hardware(DEFAULT_PINS, factory)
+    try:
+        assert fake.levels[DEFAULT_PINS["en"]] == 1  # driver off from the start
+        hw.enable_driver()
+        assert fake.levels[DEFAULT_PINS["en"]] == 0
+    finally:
+        hw.close()

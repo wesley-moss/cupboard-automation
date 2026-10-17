@@ -113,14 +113,42 @@ def find_header_chip(lgpio_mod: Any = None) -> int:
     )
 
 
+def _factory_for_chip(chip: int) -> Any:
+    """An LGPIOFactory that really uses ``chip``.
+
+    gpiozero 2.0 and 2.0.1 (the versions in Raspberry Pi OS Bookworm) ignore
+    the chip argument and always open gpiochip4 on a Pi 5. Newer kernels
+    number the header chip differently, so that fails. If the normal factory
+    opens the wrong chip (or fails), this falls back to a subclass that skips
+    gpiozero's chip guess and opens the one we asked for.
+    """
+    import lgpio
+    from gpiozero.pins.lgpio import LGPIOFactory, LGPIOPin
+
+    try:
+        factory = LGPIOFactory(chip=chip)
+        if getattr(factory, "_chip", chip) == chip:
+            return factory
+        factory.close()
+    except Exception:
+        pass  # most likely the gpiochip4 guess; try our own way below
+
+    class HeaderChipFactory(LGPIOFactory):
+        def __init__(self, chip: int) -> None:
+            super(LGPIOFactory, self).__init__()  # skip LGPIOFactory's chip guess
+            self._handle = lgpio.gpiochip_open(chip)
+            self._chip = chip
+            self.pin_class = LGPIOPin
+
+    return HeaderChipFactory(chip)
+
+
 def make_real_factory(chip: Optional[int] = None) -> Any:
     """The lgpio pin factory, which works on the Pi 5 (RPi.GPIO does not)."""
-    from gpiozero.pins.lgpio import LGPIOFactory
-
     if chip is None:
         chip = find_header_chip()
     try:
-        return LGPIOFactory(chip=chip)
+        return _factory_for_chip(chip)
     except Exception as exc:
         raise HardwareError(
             f"Could not open /dev/gpiochip{chip} ({exc}).\n  {gpio_diagnostics()}"
