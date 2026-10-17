@@ -372,6 +372,8 @@ Sudden power loss can damage an SD card that is being written to. This program a
 - If you run a firewall on the Pi (for example `ufw`), allow port 8080: `sudo ufw allow 8080/tcp`.
 - If the log says the port is in use, another program is using 8080. Stop it, or change `web_port` in the settings file and restart.
 
+**"Could not open the GPIO header chip" or "can not open gpiochip".** The log lists each `/dev/gpiochip` device, its group, and whether the service user can open it. If it says `we can open it: NO`, run `sudo ./install.sh` again (it adds a rule giving the `gpio` group access) and check `id cupboard-door` lists `gpio`. You can also check by hand with `ls -l /dev/gpiochip*`: the group should be `gpio` and the mode `crw-rw----`.
+
 **"Could not set up the GPIO pins".** Another program is using the pins. Usually this means the service is still running while you start test mode by hand. Use `test-mode.sh`, which stops the service for you.
 
 ## 15. Why gpiozero with lgpio
@@ -444,6 +446,7 @@ sudo systemctl daemon-reload
 sudo rm -rf /opt/cupboard-door
 sudo rm -rf /var/lib/cupboard-door      # deletes your settings
 sudo userdel cupboard-door
+sudo rm -f /etc/udev/rules.d/99-cupboard-door-gpio.rules
 ```
 
 To turn 1-Wire off as well, remove the `dtoverlay=w1-gpio,gpiopin=4` line (and the comment above it) from `/boot/firmware/config.txt` and reboot. The installer saved the original as `config.txt.before-cupboard-door`.

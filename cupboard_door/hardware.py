@@ -7,7 +7,12 @@ MockFactory) without any changes.
 
 from __future__ import annotations
 
+import glob
+import grp
 import logging
+import os
+import pwd
+import stat
 import threading
 import time
 from typing import Any, Optional
@@ -27,11 +32,99 @@ def busy_wait(seconds: float) -> None:
         pass
 
 
+def _is_header_chip(label: str) -> bool:
+    """True for the chip wired to the 40-pin header: "pinctrl-rp1" on a Pi 5,
+    "pinctrl-bcm2711" / "pinctrl-bcm2835" on older Pis. The Pi 5 also has
+    other GPIO chips (for example "gpio-brcmstb@...") that must not be used."""
+    return "rp1" in label or label.startswith("pinctrl-bcm")
+
+
+def _chip_numbers() -> list[int]:
+    numbers = set()
+    for path in glob.glob("/dev/gpiochip*"):
+        suffix = path[len("/dev/gpiochip"):]
+        if suffix.isdigit():
+            numbers.add(int(suffix))
+    return sorted(numbers)
+
+
+def gpio_diagnostics() -> str:
+    """Who we are and who may open each /dev/gpiochip, for error messages."""
+    try:
+        user = pwd.getpwuid(os.getuid()).pw_name
+    except KeyError:
+        user = str(os.getuid())
+    names = []
+    for gid in sorted(set(os.getgroups()) | {os.getgid()}):
+        try:
+            names.append(grp.getgrgid(gid).gr_name)
+        except KeyError:
+            names.append(str(gid))
+    lines = [f"running as user '{user}', groups: {', '.join(names)}"]
+    paths = sorted(glob.glob("/dev/gpiochip*"))
+    if not paths:
+        lines.append("no /dev/gpiochip* devices exist")
+    for path in paths:
+        try:
+            st = os.stat(path)
+            group = grp.getgrgid(st.st_gid).gr_name
+            owner = pwd.getpwuid(st.st_uid).pw_name
+            target = f" -> {os.path.realpath(path)}" if os.path.islink(path) else ""
+            can = "yes" if os.access(path, os.R_OK | os.W_OK) else "NO"
+            lines.append(
+                f"{path}{target}: owner {owner}, group {group}, mode {stat.filemode(st.st_mode)}, "
+                f"we can open it: {can}"
+            )
+        except (OSError, KeyError) as exc:
+            lines.append(f"{path}: {exc}")
+    return "\n  ".join(lines)
+
+
+def find_header_chip(lgpio_mod: Any = None) -> int:
+    """Find the gpiochip number for the 40-pin header by its label.
+
+    The number differs between Pi 5 kernels (4 on early ones, 0 on later
+    ones), so we look for the label instead of guessing.
+    """
+    if lgpio_mod is None:
+        import lgpio as lgpio_mod
+    problems = []
+    for number in _chip_numbers():
+        try:
+            handle = lgpio_mod.gpiochip_open(number)
+        except Exception as exc:
+            problems.append(f"gpiochip{number}: {exc}")
+            continue
+        try:
+            info = lgpio_mod.gpio_get_chip_info(handle)
+            label = str(info[3]) if isinstance(info, (list, tuple)) and len(info) > 3 else ""
+        finally:
+            lgpio_mod.gpiochip_close(handle)
+        if _is_header_chip(label):
+            log.info("Using /dev/gpiochip%d (%s) for the GPIO header", number, label)
+            return number
+        problems.append(f"gpiochip{number}: label '{label}' is not the GPIO header")
+    raise HardwareError(
+        "Could not open the GPIO header chip.\n  "
+        + ("\n  ".join(problems) or "no gpiochips found")
+        + "\n  " + gpio_diagnostics()
+        + "\n  If 'we can open it' says NO, the user needs to be in the group shown, "
+        "or re-run install.sh, which adds a rule giving the gpio group access."
+    )
+
+
 def make_real_factory(chip: Optional[int] = None) -> Any:
     """The lgpio pin factory, which works on the Pi 5 (RPi.GPIO does not)."""
     from gpiozero.pins.lgpio import LGPIOFactory
 
-    return LGPIOFactory() if chip is None else LGPIOFactory(chip=chip)
+    if chip is None:
+        chip = find_header_chip()
+    try:
+        return LGPIOFactory(chip=chip)
+    except Exception as exc:
+        raise HardwareError(
+            f"Could not open /dev/gpiochip{chip} ({exc}).\n  {gpio_diagnostics()}"
+        ) from exc
 
 
 class Hardware:

@@ -45,6 +45,15 @@ else
 fi
 usermod -a -G gpio "$SERVICE_USER"
 
+step "Giving the gpio group access to the GPIO chips"
+# Raspberry Pi OS normally does this already; this rule makes sure of it.
+UDEV_RULE=/etc/udev/rules.d/99-cupboard-door-gpio.rules
+echo 'SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"' > "$UDEV_RULE"
+udevadm control --reload-rules || true
+udevadm trigger --subsystem-match=gpio --action=change || true
+udevadm settle || true
+ls -l /dev/gpiochip* 2>/dev/null || echo "No /dev/gpiochip devices found"
+
 step "Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
 rm -rf "$APP_DIR/cupboard_door"
