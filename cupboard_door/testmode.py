@@ -29,6 +29,7 @@ Cupboard door test mode
   p         set the open position HERE (steps_to_open = current position)
   + / -     speed up / down by 50 steps per second
   ] / [     ramp steps up / down by 25
+  } / {     start speed up / down by 10 steps per second
   f         flip the opening direction (open_dir)
   x         reset a fault
   space     stop the current move
@@ -90,7 +91,7 @@ def run_test_mode(store: ConfigStore, simulate: bool = False, sim_start_open: bo
             temp = temps.temperature
             line = (
                 f"{s['state']:<8} pos {str(s['position']):>6}  open at {cfg.steps_to_open}  "
-                f"speed {cfg.speed_pps}  ramp {cfg.ramp_steps}  dir {cfg.open_dir}  "
+                f"speed {cfg.speed_pps}  start {cfg.start_pps}  ramp {cfg.ramp_steps}  dir {cfg.open_dir}  "
                 f"closed sw {'PRESSED' if s['closed_switch'] else 'open   '}  "
                 f"book {'in ' if s['book_switch'] else 'OUT'}  "
                 f"temp {'--' if temp is None else f'{temp:.1f}C'}"
@@ -128,6 +129,10 @@ def run_test_mode(store: ConfigStore, simulate: bool = False, sim_start_open: bo
                 change("ramp_steps", cfg.ramp_steps + 25)
             elif key == "[":
                 change("ramp_steps", cfg.ramp_steps - 25)
+            elif key == "}":
+                change("start_pps", cfg.start_pps + 10)
+            elif key == "{":
+                change("start_pps", cfg.start_pps - 10)
             elif key == "f":
                 change("open_dir", 1 - cfg.open_dir)
             elif key == "x":

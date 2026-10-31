@@ -154,6 +154,7 @@ Keys:
 | `p` | set the open position here (steps_to_open = current position) |
 | `+` / `-` | speed up / down by 50 steps per second |
 | `]` / `[` | more / fewer ramp steps |
+| `}` / `{` | start speed up / down by 10 steps per second |
 | `f` | flip the opening direction |
 | `x` | reset a fault |
 | space | stop the current move |
@@ -187,7 +188,7 @@ It shows:
 
 Buttons: OPEN, CLOSE, TOGGLE, jog -200, -50, +50, +200 steps, and Reset fault when there is a fault.
 
-The settings form changes steps_to_open, speed, ramp steps, opening direction, temperature change, temperature window and book lockout. Saved settings take effect straight away, without a restart.
+The settings form changes steps_to_open, speed, ramp steps, start and finish speed, extra closing steps, opening direction, temperature change, temperature window and book lockout. Saved settings take effect straight away, without a restart.
 
 ## 7. How the door decides what to do
 

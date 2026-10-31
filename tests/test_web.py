@@ -95,3 +95,12 @@ def test_sim_book_pull(client):
 def test_sim_temperature(client):
     r = client.post("/api/sim/temperature", json={"delta": 2})
     assert r.get_json()["temperature_c"] == 23.0
+
+
+def test_ramp_settings_on_web_page_can_be_saved(client):
+    page = client.get("/").data
+    assert b'name="start_pps"' in page and b'name="close_margin_steps"' in page
+    r = client.post("/api/config", json={"start_pps": 60, "close_margin_steps": 5700})
+    assert r.status_code == 200
+    cfg = client.system.store.config
+    assert cfg.start_pps == 60 and cfg.close_margin_steps == 5700
