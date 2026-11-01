@@ -69,6 +69,13 @@ def create_app(system: "System") -> Flask:
             return jsonify({"ok": False, "message": f"steps must be 1 to {MAX_JOG_STEPS}, + or -"}), 400
         return _reply(door.request("jog", source="Web", steps=steps))
 
+    @app.post("/api/stop")
+    def stop() -> Any:
+        if not door.is_moving:
+            return jsonify({"ok": True, "message": "Nothing is moving", "started": False})
+        door.abort_move()
+        return jsonify({"ok": True, "message": "Stopping", "started": False})
+
     @app.post("/api/reset_fault")
     def reset_fault() -> Any:
         return _reply(door.reset_fault())

@@ -104,3 +104,35 @@ def test_ramp_settings_on_web_page_can_be_saved(client):
     assert r.status_code == 200
     cfg = client.system.store.config
     assert cfg.start_pps == 60 and cfg.close_margin_steps == 5700
+
+
+def test_stop_ends_a_move(client):
+    store = client.system.store
+    store.update({"speed_pps": 200, "start_pps": 200}, save=False)  # slow enough to catch
+    assert client.post("/api/jog", json={"steps": 150}).status_code == 202
+    time.sleep(0.1)
+    r = client.post("/api/stop")
+    assert r.status_code == 200 and r.get_json()["message"] == "Stopping"
+    wait_idle(client)
+    status = client.get("/api/status").get_json()
+    assert 0 < status["position"] < 150
+    assert status["driver_enabled"] is False
+
+
+def test_stop_when_idle_is_harmless(client):
+    r = client.post("/api/stop")
+    assert r.status_code == 200 and r.get_json()["message"] == "Nothing is moving"
+    assert client.post("/api/jog", json={"steps": 20}).status_code == 202  # next move still works
+    wait_idle(client)
+    assert client.get("/api/status").get_json()["position"] == 20
+
+
+def test_large_jog_allowed(client):
+    assert client.post("/api/jog", json={"steps": 100000}).status_code == 202
+    client.post("/api/stop")
+    wait_idle(client)
+
+
+def test_page_has_jog_slider_and_stop(client):
+    page = client.get("/").data
+    assert b'id="jogSlider"' in page and b"act('stop')" in page

@@ -30,6 +30,12 @@
   .row { display: grid; gap: 8px; }
   .row.three { grid-template-columns: repeat(3, 1fr); }
   .row.four { grid-template-columns: repeat(4, 1fr); }
+  .jog-label { display: block; margin-bottom: 6px; color: var(--dim); }
+  .jog-label strong { color: var(--text); font-variant-numeric: tabular-nums; }
+  .jog-size { display: grid; grid-template-columns: 1fr 7.5em; gap: 10px; align-items: center; }
+  .jog-size input[type=range] { padding: 0; accent-color: var(--accent); min-height: 32px; }
+  .jog-scale { display: flex; justify-content: space-between; font-size: .75rem; color: var(--dim);
+               margin-right: calc(7.5em + 10px); padding: 0 2px; }
   button { font: inherit; font-weight: 600; color: var(--text); background: #2a313b;
            border: 1px solid var(--line); border-radius: 10px; padding: 14px 6px;
            cursor: pointer; min-height: 48px; }
@@ -81,12 +87,19 @@
       <button class="primary" onclick="act('close')">CLOSE</button>
       <button class="primary" onclick="act('toggle')">TOGGLE</button>
     </div>
-    <h2 style="margin-top:16px">Jog (steps, + is the open direction)</h2>
-    <div class="row four">
-      <button onclick="jog(-200)">-200</button>
-      <button onclick="jog(-50)">-50</button>
-      <button onclick="jog(50)">+50</button>
-      <button onclick="jog(200)">+200</button>
+    <h2 style="margin-top:16px">Jog</h2>
+    <label for="jogSlider" class="jog-label">Jog size: <strong><output id="jogOut">200</output> steps</strong></label>
+    <div class="jog-size">
+      <input id="jogSlider" type="range" min="0" max="100" step="1" value="40"
+             aria-label="Jog size" oninput="jogFromSlider()">
+      <input id="jogNum" type="number" min="1" max="1000000" step="1" value="200"
+             aria-label="Jog size in steps" oninput="jogFromNumber()">
+    </div>
+    <div class="jog-scale"><span>10</span><span>100</span><span>1k</span><span>10k</span><span>100k</span></div>
+    <div class="row three" style="margin-top:10px">
+      <button onclick="jog(-1)">&#9664; Close by</button>
+      <button class="danger" onclick="act('stop')">STOP</button>
+      <button onclick="jog(1)">Open by &#9654;</button>
     </div>
     <div id="actMsg" class="msg"></div>
   </section>
@@ -152,7 +165,32 @@ async function act(name) {
   refresh();
 }
 
-async function jog(steps) {
+// Jog size slider. It is logarithmic (10 to 100,000 steps) because with
+// microstepping and a gearbox a useful jog can be anything from a few steps
+// to tens of thousands. The chosen size is remembered in this browser only.
+const JOG_MIN_EXP = 1, JOG_MAX_EXP = 5;
+function niceRound(n) {
+  const mag = Math.pow(10, Math.floor(Math.log10(n)) - 1);
+  return Math.max(1, Math.round(n / mag) * mag);
+}
+function sliderToSteps(v) { return niceRound(Math.pow(10, JOG_MIN_EXP + (JOG_MAX_EXP - JOG_MIN_EXP) * v / 100)); }
+function stepsToSlider(n) {
+  const v = (Math.log10(Math.max(n, 1)) - JOG_MIN_EXP) / (JOG_MAX_EXP - JOG_MIN_EXP) * 100;
+  return Math.min(100, Math.max(0, Math.round(v)));
+}
+function setJogSize(n, fromNumber) {
+  n = Math.min(1000000, Math.max(1, Math.round(n) || 1));
+  $("jogOut").textContent = n.toLocaleString();
+  if (!fromNumber) $("jogNum").value = n;
+  $("jogSlider").value = stepsToSlider(n);
+  try { localStorage.setItem("jogSize", String(n)); } catch (e) {}
+}
+function jogFromSlider() { setJogSize(sliderToSteps(Number($("jogSlider").value)), false); }
+function jogFromNumber() { setJogSize(Number($("jogNum").value), true); }
+function jogSize() { return Math.min(1000000, Math.max(1, Math.round(Number($("jogNum").value)) || 1)); }
+
+async function jog(direction) {
+  const steps = direction * jogSize();
   try {
     const { ok, data } = await call("POST", "/api/jog", { steps });
     show($("actMsg"), data.message, !ok);
@@ -221,6 +259,11 @@ async function saveSettings(ev) {
   } catch (e) { show($("setMsg"), "Cannot reach the door controller", true); }
 }
 
+(function () {
+  let saved = 200;
+  try { saved = Number(localStorage.getItem("jogSize")) || 200; } catch (e) {}
+  setJogSize(saved, false);
+})();
 refresh();
 loadSettings();
 setInterval(refresh, 1000);

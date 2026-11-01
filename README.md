@@ -186,7 +186,9 @@ It shows:
 - the last thing that happened
 - both switches, the position in steps, and whether the motor driver is on
 
-Buttons: OPEN, CLOSE, TOGGLE, jog -200, -50, +50, +200 steps, and Reset fault when there is a fault.
+Buttons: OPEN, CLOSE, TOGGLE, and Reset fault when there is a fault.
+
+Jog: set the jog size with the slider (10 to 100,000 steps, spaced so small sizes are easy to pick) or type an exact number, then press "Close by" or "Open by". STOP ends any move straight away. The page remembers your jog size on that phone or computer. A jog towards closed still stops at the closed switch.
 
 The settings form changes steps_to_open, speed, ramp steps, start and finish speed, extra closing steps, opening direction, temperature change, temperature window and book lockout. Saved settings take effect straight away, without a restart.
 
@@ -245,6 +247,7 @@ All endpoints are under `/api/`. Moves start in the background and return straig
 | `POST /api/jog` with `{"steps": 50}` | jog; positive is the opening direction |
 | `GET /api/config` | current settings and allowed ranges |
 | `POST /api/config` with `{"speed_pps": 900}` | change and save settings (any subset) |
+| `POST /api/stop` | stop the current move straight away |
 | `POST /api/reset_fault` | clear a fault |
 
 Replies are JSON like `{"ok": true, "message": "Opening", "started": true}`. HTTP codes: 202 a move started, 200 done or nothing to do, 400 bad input, 409 refused (busy or fault).
