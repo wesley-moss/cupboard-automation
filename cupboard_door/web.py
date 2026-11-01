@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-MAX_JOG_STEPS = 10_000
+MAX_JOG_STEPS = 1_000_000
 
 
 def _reply(result: Result) -> Any:

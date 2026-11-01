@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Iterable, Iterator, Sequence
 
 from .hardware import Hardware
 
@@ -12,7 +12,7 @@ ENABLE_SETTLE_S = 0.005  # give the A4988 a moment after /ENABLE goes low
 MIN_GAP_FRACTION = 0.75  # after a late step, the next gap is never shorter than 75% of planned
 
 
-def step_speeds(total_steps: int, speed_pps: float, ramp_steps: int, start_pps: float) -> list[float]:
+def iter_step_speeds(total_steps: int, speed_pps: float, ramp_steps: int, start_pps: float) -> Iterator[float]:
     """Speed (steps per second) for each step of a trapezoidal move.
 
     The move starts at ``start_pps``, speeds up over ``ramp_steps`` steps to
@@ -22,21 +22,27 @@ def step_speeds(total_steps: int, speed_pps: float, ramp_steps: int, start_pps: 
 
     The speed for step k into a ramp is sqrt(v0^2 + (v1^2 - v0^2) * k / ramp),
     which is constant acceleration (a straight line on a speed vs time graph).
+
+    Speeds are worked out one step at a time, so a long move (microstepping
+    through a gearbox can mean hundreds of thousands of steps) starts at once
+    and uses almost no memory.
     """
     if total_steps <= 0:
-        return []
+        return
     speed = float(speed_pps)
     start = min(float(start_pps), speed)
     ramp = max(0, min(int(ramp_steps), total_steps // 2))
-    speeds: list[float] = []
     for i in range(total_steps):
         k = min(i, total_steps - 1 - i)  # steps from the nearest end of the move
         if k < ramp:
-            v = math.sqrt(start * start + (speed * speed - start * start) * k / ramp)
+            yield math.sqrt(start * start + (speed * speed - start * start) * k / ramp)
         else:
-            v = speed
-        speeds.append(v)
-    return speeds
+            yield speed
+
+
+def step_speeds(total_steps: int, speed_pps: float, ramp_steps: int, start_pps: float) -> list[float]:
+    """The same speeds as a list (handy for tests and short moves)."""
+    return list(iter_step_speeds(total_steps, speed_pps, ramp_steps, start_pps))
 
 
 def step_delays(speeds: Iterable[float]) -> list[float]:

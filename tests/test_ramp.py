@@ -106,3 +106,22 @@ def test_move_stops_when_asked():
     hw = FakeHw(clock, late_step=-1)
     done = Motor(hw, clock=clock, sleep=clock.sleep).move(1, [1000.0] * 50, lambda: len(hw.pulses) >= 7)
     assert done == 7 and not hw.enabled
+
+
+def test_long_moves_are_worked_out_lazily():
+    import itertools
+
+    from cupboard_door.motor import iter_step_speeds
+
+    # 1/16 microstepping through a 19:1 gearbox: a million steps must not build a list first
+    gen = iter_step_speeds(1_000_000, 3200, 8000, 800)
+    first = list(itertools.islice(gen, 3))
+    assert first[0] == pytest.approx(800) and first[2] > first[1] > first[0]
+
+
+def test_limits_allow_microstepping_through_a_gearbox():
+    from cupboard_door.config import validate_settings
+
+    big = {"steps_to_open": 480_000, "close_margin_steps": 48_000, "ramp_steps": 16_000,
+           "start_pps": 1_600, "speed_pps": 6_400}
+    assert validate_settings(big) == big

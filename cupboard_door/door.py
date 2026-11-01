@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Optional
 
 from .config import ConfigStore
 from .hardware import Hardware, busy_wait
-from .motor import Motor, step_speeds
+from .motor import Motor, iter_step_speeds
 
 log = logging.getLogger(__name__)
 
@@ -207,9 +208,9 @@ class Door:
             self._move_lock.release()
 
     # ------------------------------------------------------------------ moves
-    def _speeds(self, steps: int) -> list[float]:
+    def _speeds(self, steps: int) -> Iterator[float]:
         cfg = self.store.config
-        return step_speeds(steps, cfg.speed_pps, cfg.ramp_steps, cfg.start_pps)
+        return iter_step_speeds(steps, cfg.speed_pps, cfg.ramp_steps, cfg.start_pps)
 
     def _open(self) -> None:
         cfg = self.store.config
@@ -240,7 +241,7 @@ class Door:
         # Normal ramped move for the distance we expect, then creep slowly for
         # the margin so the switch is met gently if the door is further out.
         creep = min(cfg.start_pps, cfg.speed_pps)
-        speeds = self._speeds(expected) + [float(creep)] * (limit - expected)
+        speeds = itertools.chain(self._speeds(expected), itertools.repeat(float(creep), limit - expected))
         self._set(DoorState.CLOSING, start)
 
         def should_stop() -> bool:

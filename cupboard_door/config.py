@@ -30,12 +30,12 @@ DEFAULT_PINS: dict[str, int] = {
 # Allowed range for each setting: (type, minimum, maximum).
 # These are also the settings the web page and the API may change.
 SETTING_LIMITS: dict[str, tuple[type, float, float]] = {
-    "steps_to_open": (int, 1, 200_000),
-    "speed_pps": (int, 10, 10_000),
-    "ramp_steps": (int, 0, 50_000),
-    "start_pps": (int, 10, 5_000),
+    "steps_to_open": (int, 1, 2_000_000),
+    "speed_pps": (int, 10, 20_000),
+    "ramp_steps": (int, 0, 500_000),
+    "start_pps": (int, 10, 10_000),
     "open_dir": (int, 0, 1),
-    "close_margin_steps": (int, 0, 50_000),
+    "close_margin_steps": (int, 0, 500_000),
     "temp_delta_c": (float, 0.1, 50.0),
     "temp_window_s": (int, 10, 86_400),
     "temp_poll_s": (float, 1.0, 600.0),
