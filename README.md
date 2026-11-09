@@ -229,6 +229,7 @@ The settings live in `/var/lib/cupboard-door/door_config.json`. Change them on t
 | `book_debounce_ms` | 50 | How long the lever must stay released to count |
 | `book_lockout_s` | 3.0 | Time after a toggle when more pulls are ignored |
 | `web_port` | 8080 | Web page port (restart needed) |
+| `enable_settle_ms` | 150 | Wait after switching the motor driver on, before the first step. A TMC2209 needs about 150 ms to measure the motor in its quiet mode; an A4988 works with 5 |
 | `sensor_wait_s` | 60 | How long to wait for the sensor at start-up before carrying on without it |
 | `pins` | see wiring | GPIO numbers (restart needed) |
 

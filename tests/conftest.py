@@ -21,6 +21,7 @@ FAST = {
     "ramp_steps": 20,
     "start_pps": 4000,
     "close_margin_steps": 50,
+    "enable_settle_ms": 0,
 }
 
 

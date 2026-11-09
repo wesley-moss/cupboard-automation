@@ -8,7 +8,11 @@ from typing import Callable, Iterable, Iterator, Sequence
 
 from .hardware import Hardware
 
-ENABLE_SETTLE_S = 0.005  # give the A4988 a moment after /ENABLE goes low
+# Default wait after /ENABLE goes low, before the first step. An A4988 needs
+# almost none, but a TMC2209 in StealthChop measures the motor at standstill
+# when it is switched on (over 100 ms), and steps sent before that finishes
+# can come out weak. Set per install with enable_settle_ms.
+ENABLE_SETTLE_S = 0.15
 MIN_GAP_FRACTION = 0.75  # after a late step, the next gap is never shorter than 75% of planned
 
 
@@ -77,6 +81,7 @@ class Motor:
         dir_level: int,
         speeds: Sequence[float] | Iterable[float],
         should_stop: Callable[[], bool],
+        settle_s: float = ENABLE_SETTLE_S,
     ) -> int:
         """Step once per entry in ``speeds``. Returns how many steps were made.
 
@@ -87,7 +92,7 @@ class Motor:
         self.hw.enable_driver()
         done = 0
         try:
-            self._sleep(ENABLE_SETTLE_S)
+            self._sleep(settle_s)
             deadline = self._clock()
             for speed in speeds:
                 if should_stop():

@@ -125,3 +125,22 @@ def test_limits_allow_microstepping_through_a_gearbox():
     big = {"steps_to_open": 480_000, "close_margin_steps": 48_000, "ramp_steps": 16_000,
            "start_pps": 1_600, "speed_pps": 6_400}
     assert validate_settings(big) == big
+
+
+def test_driver_settles_before_first_step():
+    from cupboard_door.motor import Motor
+
+    clock = FakeClock()
+    hw = FakeHw(clock, late_step=-1)
+    Motor(hw, clock=clock, sleep=clock.sleep).move(1, [1000.0] * 3, lambda: False, settle_s=0.15)
+    assert hw.pulses[0] >= 0.15  # nothing stepped until the driver had settled
+
+
+def test_settle_time_comes_from_settings(make_system, store):
+    store.update({"enable_settle_ms": 120}, save=False)
+    system = make_system()
+    seen = []
+    real_move = system.door.motor.move
+    system.door.motor.move = lambda *a, **k: seen.append(a[3]) or real_move(*a, **k)
+    system.door.request("jog", steps=5, wait=True)
+    assert seen == [0.12]

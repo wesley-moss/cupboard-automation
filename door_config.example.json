@@ -11,6 +11,7 @@
   "temp_poll_s": 10.0,
   "book_debounce_ms": 50,
   "book_lockout_s": 3.0,
+  "enable_settle_ms": 150,
   "web_port": 8080,
   "sensor_wait_s": 60,
   "w1_devices_dir": "/sys/bus/w1/devices",

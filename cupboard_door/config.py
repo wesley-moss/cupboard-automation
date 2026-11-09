@@ -41,6 +41,7 @@ SETTING_LIMITS: dict[str, tuple[type, float, float]] = {
     "temp_poll_s": (float, 1.0, 600.0),
     "book_debounce_ms": (int, 1, 1_000),
     "book_lockout_s": (float, 0.0, 120.0),
+    "enable_settle_ms": (int, 0, 2_000),
 }
 
 
@@ -64,6 +65,8 @@ class Config:
     # Book lever
     book_debounce_ms: int = 50
     book_lockout_s: float = 3.0
+    # Motor driver: wait after switching the driver on, before the first step
+    enable_settle_ms: int = 150
     # System (only read at start-up)
     web_port: int = 8080
     sensor_wait_s: int = 60

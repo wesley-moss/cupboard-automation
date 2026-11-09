@@ -217,7 +217,7 @@ class Door:
         start = self.position or 0
         steps = cfg.steps_to_open - start
         self._set(DoorState.OPENING, start)
-        done = self.motor.move(cfg.open_dir, self._speeds(steps), self._abort.is_set)
+        done = self.motor.move(cfg.open_dir, self._speeds(steps), self._abort.is_set, cfg.enable_settle_ms / 1000)
         position = start + done
         self._set(DoorState.OPEN, position)
         if done == steps and self.hw.door_closed_pressed():
@@ -247,7 +247,7 @@ class Door:
         def should_stop() -> bool:
             return self._abort.is_set() or self._closed_switch_confirmed()
 
-        done = self.motor.move(1 - cfg.open_dir, speeds, should_stop)
+        done = self.motor.move(1 - cfg.open_dir, speeds, should_stop, cfg.enable_settle_ms / 1000)
 
         if self.hw.door_closed_pressed():
             self._set(DoorState.CLOSED, 0)
@@ -275,7 +275,7 @@ class Door:
             # A jog towards closed still stops at the closed switch.
             return self._abort.is_set() or (closing and self._closed_switch_confirmed())
 
-        done = self.motor.move(dir_level, self._speeds(abs(steps)), should_stop)
+        done = self.motor.move(dir_level, self._speeds(abs(steps)), should_stop, cfg.enable_settle_ms / 1000)
         position = None if start is None else start + (-done if closing else done)
         if self.hw.door_closed_pressed():
             self._set(DoorState.CLOSED, 0)
